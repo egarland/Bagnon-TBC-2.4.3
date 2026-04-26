@@ -18,6 +18,17 @@ Sort.Proprieties = {
 
 Sort.init = false
 
+-- Manual class overrides for specific item IDs (itemID = classIndex)
+-- Use GetAuctionItemClasses() to find valid class indices
+-- Hearthstone (id: 6948) is typically class 0 (Consumable/Miscellaneous)
+Sort.ClassOverrides = {
+  [6948] = 13,  -- Hearthstone
+  [7005] = 13,  -- Skinning Knife
+  [12784] = 13, -- Hardened Steel Skinning Knife
+  [19830] = 13, -- Bladed Mantis
+  [2901] = 13,  -- Mining Pick
+}
+
 function Sort:Init()
   Sort.init = true
   Sort.Classes = {}
@@ -140,11 +151,12 @@ function Sort:GetSpaces()
       item.space = spaces[#spaces]
       if link then
         local itemName, itemLink, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount = GetItemInfo(link)
-        item.class = Sort.Classes[itemType] and Sort.Classes[itemType].index or 0
+        item.id =  tonumber(link:match("item:(%d+)")) or 0
+                -- Use manual override if defined, otherwise use GetItemInfo class
+        item.class = Sort.ClassOverrides[item.id] or (Sort.Classes[itemType] and Sort.Classes[itemType].index or 0)
         item.subclass = Sort.Classes[itemType] and Sort.Classes[itemType].subClasses[itemSubType] or 0
         item.stack = itemStackCount
         item.count = count
-        item.id =  tonumber(link:match("item:(%d+)")) or 0
         item.locked = locked
         item.quality = quality
         item.icon = texture
