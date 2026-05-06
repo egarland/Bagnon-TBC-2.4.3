@@ -22,11 +22,23 @@ Sort.init = false
 -- Use GetAuctionItemClasses() to find valid class indices
 -- Hearthstone (id: 6948) is typically class 0 (Consumable/Miscellaneous)
 Sort.ClassOverrides = {
-  [6948] = 13,  -- Hearthstone
+  [6948] = 14,  -- Hearthstone
   [7005] = 13,  -- Skinning Knife
-  [12784] = 13, -- Hardened Steel Skinning Knife
-  [19830] = 13, -- Bladed Mantis
   [2901] = 13,  -- Mining Pick
+  [17034] = 13 -- Maple Seed
+
+}
+
+if not StaticPopupDialogs then
+  StaticPopupDialogs = {}
+end
+
+StaticPopupDialogs['BAGNON_GUILD_BANK'] = {
+  text = 'guild bank tab: %s',
+  button1 = OKAY,
+  timeout = 0,
+  whileDead = 1,
+  hideOnEscape = 1,
 }
 
 function Sort:Init()
@@ -141,30 +153,62 @@ end
 function Sort:GetSpaces()
   local spaces = {}
   local itemFrame = self.itemFrame
-  for _, bag in itemFrame:GetVisibleBags() do
-    local family = Bagnon.BagSlotInfo:GetBagType(itemFrame:GetPlayer(), bag)
-		for slot = 1, itemFrame:GetBagSize(bag) do
-			local itemSlot = itemFrame:GetItemSlot(bag, slot)
-      local texture, count, locked, quality, readable, lootable, link = itemSlot:GetItemSlotInfo()
-      local item = {}
-      tinsert(spaces, {index = #spaces, bag = bag, slot = slot, family = family, item = item})
-      item.space = spaces[#spaces]
-      if link then
-        local itemName, itemLink, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount = GetItemInfo(link)
-        item.id =  tonumber(link:match("item:(%d+)")) or 0
-                -- Use manual override if defined, otherwise use GetItemInfo class
-        item.class = Sort.ClassOverrides[item.id] or (Sort.Classes[itemType] and Sort.Classes[itemType].index or 0)
-        item.subclass = Sort.Classes[itemType] and Sort.Classes[itemType].subClasses[itemSubType] or 0
-        item.stack = itemStackCount
-        item.count = count
-        item.locked = locked
-        item.quality = quality
-        item.icon = texture
-        item.level = itemLevel
-        item.name = itemName
+
+   if itemFrame and itemFrame.GetFrameID and itemFrame:GetFrameID() == 'guildbank' and GetCurrentGuildBankTab then
+    local guildTab = GetCurrentGuildBankTab()
+    
+    if guildTab and guildTab > 0 then
+
+      local slotsPerTab = NUM_SLOTS_PER_GUILDBANK_TAB or 98
+      local family = 0
+      for slot = 1, slotsPerTab do
+
+        local texture, count, locked, quality, readable, lootable = GetGuildBankItemInfo(guildTab, slot)
+        local link = GetGuildBankItemLink(guildTab, slot)
+        local item = {}
+        tinsert(spaces, {index = #spaces, bag = guildTab, slot = slot, family = family, item = item, guildBank = true})
+        item.space = spaces[#spaces]
+        if link then
+          local itemName, itemLink, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount = GetItemInfo(link)
+          item.id = tonumber(link:match("item:(%d+)")) or 0
+          item.class = Sort.ClassOverrides[item.id] or (Sort.Classes[itemType] and Sort.Classes[itemType].index or 0)
+          item.subclass = Sort.Classes[itemType] and Sort.Classes[itemType].subClasses[itemSubType] or 0
+          item.stack = itemStackCount
+          item.count = count
+          item.locked = locked
+          item.quality = quality
+          item.icon = texture
+          item.level = itemLevel
+          item.name = itemName
+        end
       end
-		end
-	end
+    end
+  else 
+    for _, bag in itemFrame:GetVisibleBags() do
+      local family = Bagnon.BagSlotInfo:GetBagType(itemFrame:GetPlayer(), bag)
+      for slot = 1, itemFrame:GetBagSize(bag) do
+        local itemSlot = itemFrame:GetItemSlot(bag, slot)
+        local texture, count, locked, quality, readable, lootable, link = itemSlot:GetItemSlotInfo()
+        local item = {}
+        tinsert(spaces, {index = #spaces, bag = bag, slot = slot, family = family, item = item, guildBank = false})
+        item.space = spaces[#spaces]
+        if link then
+          local itemName, itemLink, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount = GetItemInfo(link)
+          item.id =  tonumber(link:match("item:(%d+)")) or 0
+                  -- Use manual override if defined, otherwise use GetItemInfo class
+          item.class = Sort.ClassOverrides[item.id] or (Sort.Classes[itemType] and Sort.Classes[itemType].index or 0)
+          item.subclass = Sort.Classes[itemType] and Sort.Classes[itemType].subClasses[itemSubType] or 0
+          item.stack = itemStackCount
+          item.count = count
+          item.locked = locked
+          item.quality = quality
+          item.icon = texture
+          item.level = itemLevel
+          item.name = itemName
+        end
+      end
+    end
+  end
   --[[
   for _, bag in pairs(self.bags) do
     local link, count, texture = bag:GetBagInfo()
@@ -247,8 +291,13 @@ function Sort:Move(from, to)
   end
 
   ClearCursor()
-  PickupContainerItem(from.bag, from.slot)
-  PickupContainerItem(to.bag, to.slot)
+  if from.guildBank then
+    PickupGuildBankItem(from.bag, from.slot)
+    PickupGuildBankItem(to.bag, to.slot)
+  else 
+    PickupContainerItem(from.bag, from.slot)
+    PickupContainerItem(to.bag, to.slot)
+  end
   ClearCursor()
 
   from.locked = true
